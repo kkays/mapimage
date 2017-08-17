@@ -9,7 +9,7 @@ import zipfile
 KML_PHOTO = """
       <Placemark>
         <name>{name}</name>
-        <description><![CDATA[<img src="{url}"/><br><br>]]></description>
+        <description><![CDATA[<img src="images/{url}"/><br><br>]]></description>
         <styleUrl>#icon-1899-DB4436</styleUrl>
         <Point>
           <coordinates>
@@ -56,6 +56,7 @@ def _get_lat_lon(filename):
 
 def convert(filename):
   lat, lon = _get_lat_lon(filename)
+  filename = filename.split('/')[-1]
   return KML_PHOTO.format(
       name=filename,
       url=filename,
