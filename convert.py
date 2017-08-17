@@ -1,6 +1,9 @@
 import PIL.Image
 import PIL.ExifTags
 import math
+import glob
+import argparse
+import zipfile
 
 # Takes name, url, lon, lat
 KML_PHOTO = """
@@ -59,5 +62,30 @@ def convert(filename):
       lat=lat,
       lon=lon)
 
+def get_image_list(directory):
+  return [
+      f for f in glob.glob(directory + '/*')
+      if f.endswith(('.jpg', '.gif', '.png'))
+  ]
+
+def convert_dir(directory):
+  return ''.join(map(convert, get_image_list(directory)))
+
+def main(directory, target):
+  output = zipfile.ZipFile(target, mode='w')
+  try:
+    for image in get_image_list(directory):
+      output.write(image, 'images/' + image.split('/')[-1])
+    output.writestr('main.kml', convert_dir(directory))
+  finally:
+    output.close()
+
 if __name__ == '__main__':
-  print(convert('images/img.jpg'))
+  parser = argparse.ArgumentParser(
+      description='Create a KMZ file from a directory of images (jpg, gif, png).')
+  parser.add_argument('source', metavar='s', type=str,
+      help='the name of the directory where images are stored.' )
+  parser.add_argument('target', metavar='t', type=str, default='out.kmz',
+      help='the name of the kmz output.' )
+  args = parser.parse_args()
+  main(args.source, args.target)
