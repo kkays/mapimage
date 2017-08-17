@@ -9,7 +9,7 @@ import zipfile
 KML_PHOTO = """
       <Placemark>
         <name>{name}</name>
-        <description><![CDATA[<img src="images/{url}"/><br><br>]]></description>
+        <description><![CDATA[<img width="600" src="images/{url}"/><br><br>]]></description>
         <styleUrl>#icon-1899-DB4436</styleUrl>
         <Point>
           <coordinates>
@@ -44,18 +44,20 @@ def _dms_to_dec(coord, ref):
   return -result if ref in 'SW' else result
 
 def _get_lat_lon(filename):
-  exif = _get_exif(filename)
-  if ('GPSLatitude' not in exif or
-      'GPSLatitudeRef' not in exif or
-      'GPSLongitude' not in exif or
-      'GPSLongitudeRef' not in exif):
-    raise KeyError('No exif data for {}'.format('filename'))
-  lat = _dms_to_dec(exif['GPSLatitude'], exif['GPSLatitudeRef'])
-  lon = _dms_to_dec(exif['GPSLongitude'], exif['GPSLongitudeRef'])
-  return lat, lon
+  try:
+    exif = _get_exif(filename)
+    lat = _dms_to_dec(exif['GPSLatitude'], exif['GPSLatitudeRef'])
+    lon = _dms_to_dec(exif['GPSLongitude'], exif['GPSLongitudeRef'])
+    return lat, lon
+  except (KeyError, AttributeError):
+    raise KeyError('No exif data for {}'.format(filename))
 
 def convert(filename):
-  lat, lon = _get_lat_lon(filename)
+  try:
+    lat, lon = _get_lat_lon(filename)
+  except KeyError as e:
+    print e
+    return ''
   filename = filename.split('/')[-1]
   return KML_PHOTO.format(
       name=filename,
@@ -70,7 +72,7 @@ def get_image_list(directory):
   ]
 
 def convert_dir(directory):
-  return ''.join(map(convert, get_image_list(directory)))
+  return '<kml><Document>' + ''.join(map(convert, get_image_list(directory))) + '</Document></kml>'
 
 def main(directory, target):
   output = zipfile.ZipFile(target, mode='w')
