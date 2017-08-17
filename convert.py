@@ -5,13 +5,13 @@ import os
 import argparse
 import zipfile
 
-IMAGE_FILETYPES = ('.jpg', '.gif', '.png')
+IMAGE_FILETYPES = ('.jpg', '.gif', '.png', '.tga')
 
 # Takes name, url, lon, lat
 KML_PLACEMARK_PHOTO = """
       <Placemark>
         <name>{name}</name>
-        <description><![CDATA[<img width="600" src="images/{url}"/><br><br>]]></description>
+        <description><![CDATA[<img width="600" src="images/{directory}"/><br><br>]]></description>
         <styleUrl>#icon-1899-DB4436</styleUrl>
         <Point>
           <coordinates>
@@ -60,47 +60,55 @@ def _get_lat_lon(filename):
   except (KeyError, AttributeError):
     raise KeyError('No exif data for {}'.format(filename))
 
-def convert_file(filename):
-  try:
-    lat, lon = _get_lat_lon(filename)
-  except KeyError as e:
-    print e
-    return ''
-  filename = filename.split('/')[-1]
-  return KML_PLACEMARK_PHOTO.format(
-      name=filename,
-      url=filename,
-      lat=lat,
-      lon=lon)
-
-def get_image_list(directory):
+def _get_image_list(directory):
   for f in os.listdir(directory):
     p = os.path.join(directory, f)
-    if os.path.isfile(p) and p.endswith(IMAGE_FILETYPES):
-      yield p
+    if os.path.isfile(p):
+      if p.lower().endswith(IMAGE_FILETYPES):
+        yield p
+      else:
+        print 'Ignoring non-image file: ' + p
 
-def get_folder_list(directory):
+def _get_folder_list(directory):
   for f in os.listdir(directory):
     p = os.path.join(directory, f)
     if os.path.isdir(p):
       yield p
 
+def convert_file(path):
+  """Converts a file to a KML Placemark string."""
+  try:
+    lat, lon = _get_lat_lon(path)
+  except KeyError as e:
+    print e
+    return ''
+  return KML_PLACEMARK_PHOTO.format(
+      name=path.split('/')[-1],
+      directory=path,
+      lat=lat,
+      lon=lon)
+
 def convert_dir(directory):
-  photo_contents = ''.join(map(convert_file, get_image_list(directory)))
-  folder_contents = ''.join(map(convert_dir, get_folder_list(directory)))
+  """Converts a directory to a KML folder string."""
+  photo_contents = ''.join(map(convert_file, _get_image_list(directory)))
+  folder_contents = ''.join(map(convert_dir, _get_folder_list(directory)))
   return KML_FOLDER.format(
     name=directory.split('/')[-1],
     contents=folder_contents + photo_contents
   )
 
-def main(directory, target):
-  output = zipfile.ZipFile(target, mode='w')
-  try:
-    for image in get_image_list(directory):
-      output.write(image, 'images/' + image.split('/')[-1])
-    output.writestr('main.kml', '<kml>' + convert_dir(directory) + '</kml>')
-  finally:
-    output.close()
+def zip_images(directory, zf):
+  """Recursively zips all of the images in a directory into zf."""
+  for root, dirs, files in os.walk(directory, topdown=True):
+    for f in files:
+      if f.lower().endswith(IMAGE_FILETYPES):
+        zf.write(os.path.join(root, f), os.path.join('images', root, f))
+
+def create_kmz(source, target):
+  """Takes a source directory and writes to a kmz named target."""
+  with zipfile.ZipFile(target, mode='w') as zf:
+    zip_images(source, zf)
+    zf.writestr('main.kml', '<kml>' + convert_dir(source) + '</kml>')
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(
@@ -110,4 +118,4 @@ if __name__ == '__main__':
   parser.add_argument('target', metavar='t', type=str, default='out.kmz',
       help='the name of the kmz output.' )
   args = parser.parse_args()
-  main(args.source, args.target)
+  create_kmz(args.source, args.target)
