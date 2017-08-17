@@ -1,9 +1,11 @@
 import PIL.Image
 import PIL.ExifTags
 import math
-import glob
+import os
 import argparse
 import zipfile
+
+IMAGE_FILETYPES = ('.jpg', '.gif', '.png')
 
 # Takes name, url, lon, lat
 KML_PLACEMARK_PHOTO = """
@@ -72,15 +74,23 @@ def convert_file(filename):
       lon=lon)
 
 def get_image_list(directory):
-  return [
-      f for f in glob.glob(directory + '/*')
-      if f.endswith(('.jpg', '.gif', '.png'))
-  ]
+  for f in os.listdir(directory):
+    p = os.path.join(directory, f)
+    if os.path.isfile(p) and p.endswith(IMAGE_FILETYPES):
+      yield p
+
+def get_folder_list(directory):
+  for f in os.listdir(directory):
+    p = os.path.join(directory, f)
+    if os.path.isdir(p):
+      yield p
 
 def convert_dir(directory):
+  photo_contents = ''.join(map(convert_file, get_image_list(directory)))
+  folder_contents = ''.join(map(convert_dir, get_folder_list(directory)))
   return KML_FOLDER.format(
     name=directory.split('/')[-1],
-    contents=''.join(map(convert_file, get_image_list(directory))),
+    contents=folder_contents + photo_contents
   )
 
 def main(directory, target):
