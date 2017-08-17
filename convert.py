@@ -6,7 +6,7 @@ import argparse
 import zipfile
 
 # Takes name, url, lon, lat
-KML_PHOTO = """
+KML_PLACEMARK_PHOTO = """
       <Placemark>
         <name>{name}</name>
         <description><![CDATA[<img width="600" src="images/{url}"/><br><br>]]></description>
@@ -17,6 +17,12 @@ KML_PHOTO = """
           </coordinates>
         </Point>
       </Placemark>
+"""
+KML_FOLDER = """
+  <Folder>
+    <name>{name}</name>
+    {contents}
+  </Folder>
 """
 
 def _get_exif(img_path):
@@ -52,14 +58,14 @@ def _get_lat_lon(filename):
   except (KeyError, AttributeError):
     raise KeyError('No exif data for {}'.format(filename))
 
-def convert(filename):
+def convert_file(filename):
   try:
     lat, lon = _get_lat_lon(filename)
   except KeyError as e:
     print e
     return ''
   filename = filename.split('/')[-1]
-  return KML_PHOTO.format(
+  return KML_PLACEMARK_PHOTO.format(
       name=filename,
       url=filename,
       lat=lat,
@@ -72,14 +78,17 @@ def get_image_list(directory):
   ]
 
 def convert_dir(directory):
-  return '<kml><Document>' + ''.join(map(convert, get_image_list(directory))) + '</Document></kml>'
+  return KML_FOLDER.format(
+    name=directory.split('/')[-1],
+    contents=''.join(map(convert_file, get_image_list(directory))),
+  )
 
 def main(directory, target):
   output = zipfile.ZipFile(target, mode='w')
   try:
     for image in get_image_list(directory):
       output.write(image, 'images/' + image.split('/')[-1])
-    output.writestr('main.kml', convert_dir(directory))
+    output.writestr('main.kml', '<kml>' + convert_dir(directory) + '</kml>')
   finally:
     output.close()
 
